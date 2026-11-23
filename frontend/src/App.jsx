@@ -1,10 +1,12 @@
+import Cardapio from "./pages/Cardapio";
+
 function App() {
-  return (
-    <div>
-      <h1>Lanchonete N2</h1>
-      <p>Meu primeiro projeto React!</p>
-    </div>
-  );
+    return (
+        <div>
+            <h1>Lanchonete</h1>
+            <Cardapio />
+        </div>
+    );
 }
 
 export default App;

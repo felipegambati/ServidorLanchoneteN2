@@ -1,15 +1,35 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import Produto from "../components/Produto";
 
-const produtos = [
-    { codigo: 1, nome: "X-Burguer", preco: 12, estoque: 10 },
-    { codigo: 2, nome: "Refrigerante", preco: 5, estoque: 20 },
-    { codigo: 3, nome: "Batata", preco: 8, estoque: 15 },
-];
-
 function Cardapio() {
+    const [produtos, setProdutos] = useState([]);
     const [nomeCliente, setNomeCliente] = useState("");
     const [quantidades, setQuantidades] = useState({});
+    const [mensagem, setMensagem] = useState("");
+    const [atualizacao, setAtualizacao] = useState(0);
+    const [enviando, setEnviando] = useState(false);
+
+    useEffect(() => {
+        async function carregarProdutos() {
+            try {
+                const resposta = await fetch("http://localhost:3001/produtos");
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.error);
+                }
+
+                setProdutos(dados);
+
+            } catch (erro) {
+                setProdutos([]);
+                setMensagem(erro.message);
+            }
+        }
+
+        carregarProdutos();
+    }, [atualizacao]);
 
     function digitar(e) {
         setNomeCliente(e.target.value);
@@ -22,13 +42,10 @@ function Cardapio() {
         });
     }
 
-
-
     async function enviar(e) {
         e.preventDefault();
 
-        if (nomeCliente.trim().length <= 5) {
-            alert("Informe um nome válido.");
+        if (enviando) {
             return;
         }
 
@@ -36,11 +53,6 @@ function Cardapio() {
 
         for (const p of produtos) {
             const qtd = Number(quantidades[p.codigo] || 0);
-
-            if (qtd < 0 || qtd % 1 !== 0 || qtd > p.estoque) {
-                alert("Quantidade inválida para " + p.nome);
-                return;
-            }
 
             if (qtd > 0) {
                 itens.push({
@@ -50,15 +62,12 @@ function Cardapio() {
             }
         }
 
-        if (itens.length === 0) {
-            alert("Selecione pelo menos um produto.");
-            return;
-        }
-
         const pedido = {
             NomeCliente: nomeCliente.trim(),
             Itens: itens
         };
+
+        setEnviando(true);
 
         try {
             const resposta = await fetch("http://localhost:3001/pedidos", {
@@ -69,48 +78,66 @@ function Cardapio() {
                 body: JSON.stringify(pedido)
             });
 
+            const dados = await resposta.json();
+
             if (!resposta.ok) {
-                throw new Error("Não foi possível realizar o pedido.");
+                if (dados.erros) {
+                    throw new Error(dados.erros[0].msg);
+                }
+
+                throw new Error(dados.error);
             }
 
-            alert("Pedido realizado com sucesso.");
+            setMensagem("Pedido realizado com sucesso.");
             setNomeCliente("");
             setQuantidades({});
+            setAtualizacao(atualizacao + 1);
 
         } catch (erro) {
-            alert(erro.message);
+            setMensagem(erro.message);
         }
-    }
 
+        setEnviando(false);
+    }
 
     return (
         <div>
             <h2>Cardápio</h2>
 
-            {produtos.map((p) => (
-                <Produto
-                    key={p.codigo}
-                    codigo={p.codigo}
-                    nome={p.nome}
-                    preco={p.preco}
-                    estoque={p.estoque}
-                    quantidade={quantidades[p.codigo] || 0}
-                    aoAlterarQuantidade={alterarQuantidade}
-                />
-            ))}
-
             <form onSubmit={enviar}>
-                <h2>Cliente</h2>
+                {produtos.map((p) => (
+                    <Produto
+                        key={p.codigo}
+                        codigo={p.codigo}
+                        nome={p.nome}
+                        preco={p.preco}
+                        estoque={p.estoque}
+                        quantidade={quantidades[p.codigo] || 0}
+                        aoAlterarQuantidade={alterarQuantidade}
+                    />
+                ))}
 
-                <input
-                    value={nomeCliente}
-                    onChange={digitar}
-                />
+                <div className="cliente">
+                    <h2>Cliente</h2>
 
-                <p>Cliente: {nomeCliente}</p>
+                    <label htmlFor="nomeCliente">Nome do cliente: </label>
 
-                <button type="submit">Enviar Pedido</button>
+                    <input
+                        type="text"
+                        id="nomeCliente"
+                        value={nomeCliente}
+                        onChange={digitar}
+                    />
+
+                    <p>Cliente: {nomeCliente}</p>
+
+                    <button type="submit" disabled={enviando || produtos.length === 0}>
+                        Enviar Pedido
+                    </button>
+                </div>
             </form>
+
+            <p className="mensagem">{mensagem}</p>
         </div>
     );
 }
